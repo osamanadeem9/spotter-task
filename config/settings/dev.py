@@ -1,4 +1,13 @@
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .envs/.env.local automatically in dev so manage.py works without
+# manually exporting variables. Docker sets env vars directly; this is a
+# no-op when the file doesn't exist (e.g. inside the container).
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".envs" / ".env.local"
+load_dotenv(_ENV_FILE, override=False)
 
 from .base import *  # noqa: F401, F403
 

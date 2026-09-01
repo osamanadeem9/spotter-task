@@ -236,3 +236,6 @@ media/
 # Editor
 .vscode/
 .idea/
+
+# Collected static files
+staticfiles/*

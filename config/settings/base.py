@@ -18,7 +18,11 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = []
 
-LOCAL_APPS: list[str] = []
+LOCAL_APPS = [
+    "stations",
+    "routing",
+    "frontend",
+]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 

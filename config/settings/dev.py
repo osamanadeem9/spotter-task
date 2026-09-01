@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 _ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".envs" / ".env.local"
 load_dotenv(_ENV_FILE, override=False)
 
-from .base import *  # noqa: F401, F403
+from .base import *  # noqa: E402, F401, F403
 
 DEBUG = True
 

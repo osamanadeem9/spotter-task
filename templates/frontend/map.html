@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spotter Fuel Cost Optimizer</title>
+
+  <!-- Leaflet core -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Leaflet.markercluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: #f5f5f5;
+    }
+
+    /* ── Top bar ── */
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: #1a1a2e;
+      color: #fff;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    #toolbar h1 {
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-right: 6px;
+      white-space: nowrap;
+    }
+
+    #toolbar input[type="text"] {
+      flex: 1;
+      min-width: 140px;
+      padding: 6px 10px;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.88rem;
+      background: #2e2e4e;
+      color: #fff;
+    }
+
+    #toolbar input[type="text"]::placeholder { color: #9999bb; }
+
+    #toolbar button {
+      padding: 7px 16px;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.88rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #btn-route {
+      background: #e94560;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    #btn-route:hover { background: #c73650; }
+    #btn-route:disabled { background: #777; cursor: not-allowed; }
+
+    #toggle-stations {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.84rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #toggle-stations input { cursor: pointer; }
+
+    /* ── Status bar ── */
+    #status-bar {
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      background: #fff;
+      border-bottom: 1px solid #ddd;
+      min-height: 30px;
+      color: #444;
+      flex-shrink: 0;
+    }
+
+    #status-bar.error { color: #c0392b; }
+
+    /* ── Map ── */
+    #map { flex: 1; }
+
+    /* ── Results panel ── */
+    #results {
+      max-height: 220px;
+      overflow-y: auto;
+      background: #fff;
+      border-top: 1px solid #ddd;
+      font-size: 0.82rem;
+      flex-shrink: 0;
+    }
+
+    #results.hidden { display: none; }
+
+    #results table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    #results th {
+      position: sticky;
+      top: 0;
+      background: #1a1a2e;
+      color: #fff;
+      padding: 6px 10px;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    #results td {
+      padding: 5px 10px;
+      border-bottom: 1px solid #eee;
+    }
+
+    #results tr:hover td { background: #f9f9f9; }
+
+    #results tfoot td {
+      font-weight: 700;
+      background: #f0f0f0;
+      border-top: 2px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <h1>Spotter Fuel Cost Optimizer</h1>
+  <input type="text" id="input-start" placeholder="Start (e.g. San Francisco, CA or 37.7749,-122.4194)" />
+  <input type="text" id="input-finish" placeholder="Finish (e.g. New York, NY or 40.7128,-74.0060)" />
+  <button id="btn-route">Find route</button>
+  <label id="toggle-stations">
+    <input type="checkbox" id="chk-stations" /> Show all stations
+  </label>
+</div>
+
+<div id="status-bar">Enter a start and finish location, then click "Find route".</div>
+
+<div id="map"></div>
+
+<div id="results" class="hidden">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Station</th>
+        <th>City, State</th>
+        <th>Mile</th>
+        <th>$/gal</th>
+        <th>Gallons</th>
+        <th>Leg cost</th>
+      </tr>
+    </thead>
+    <tbody id="results-body"></tbody>
+    <tfoot id="results-foot"></tfoot>
+  </table>
+</div>
+
+<script>
+/* ── Map initialisation ── */
+const map = L.map("map").setView([39.5, -98.35], 4);
+
+L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+  attribution:
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+    '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+  subdomains: "abcd",
+  maxZoom: 19,
+}).addTo(map);
+
+/* ── Layer groups ── */
+let routeLayer = null;         // the polyline
+let stopMarkers = null;        // optimal stop markers
+let allStationsLayer = null;   // clustered all-stations layer (lazy-loaded once)
+
+/* ── Icon helpers ── */
+function stopIcon() {
+  return L.divIcon({
+    className: "",
+    html: '<div style="width:16px;height:16px;border-radius:50%;background:#e94560;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+}
+
+function stationIcon() {
+  return L.divIcon({
+    className: "",
+    html: '<div style="width:8px;height:8px;border-radius:50%;background:#4a90d9;opacity:0.7"></div>',
+    iconSize: [8, 8],
+    iconAnchor: [4, 4],
+  });
+}
+
+/* ── Status helpers ── */
+function setStatus(msg, isError = false) {
+  const bar = document.getElementById("status-bar");
+  bar.textContent = msg;
+  bar.className = isError ? "error" : "";
+}
+
+/* ── Route call ── */
+document.getElementById("btn-route").addEventListener("click", async () => {
+  const start = document.getElementById("input-start").value.trim();
+  const finish = document.getElementById("input-finish").value.trim();
+  if (!start || !finish) {
+    setStatus("Please enter both a start and finish location.", true);
+    return;
+  }
+
+  const btn = document.getElementById("btn-route");
+  btn.disabled = true;
+  setStatus("Fetching route…");
+
+  // Clear previous route layers
+  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  if (stopMarkers) { map.removeLayer(stopMarkers); stopMarkers = null; }
+  document.getElementById("results").classList.add("hidden");
+
+  try {
+    const resp = await fetch("/api/v1/route/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie("csrftoken") },
+      body: JSON.stringify({ start, finish }),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      setStatus("Error: " + (data.error || resp.statusText), true);
+      return;
+    }
+
+    renderRoute(data);
+  } catch (err) {
+    setStatus("Network error: " + err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function renderRoute(data) {
+  const { route, fuel_stops, total_fuel_cost } = data;
+
+  // Draw polyline
+  const latlngs = route.geometry.map(([lat, lng]) => [lat, lng]);
+  routeLayer = L.polyline(latlngs, { color: "#e94560", weight: 3, opacity: 0.85 }).addTo(map);
+  map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
+
+  // Draw stop markers
+  stopMarkers = L.layerGroup().addTo(map);
+  fuel_stops.forEach((stop, i) => {
+    L.marker([stop.latitude, stop.longitude], { icon: stopIcon() })
+      .bindPopup(
+        `<b>${stop.name}</b><br>` +
+        `${stop.city}, ${stop.state}<br>` +
+        `Mile ${stop.distance_from_start_miles.toFixed(1)}<br>` +
+        `$${stop.price_per_gallon.toFixed(3)}/gal · ${stop.gallons_purchased.toFixed(1)} gal<br>` +
+        `Leg cost: <b>$${stop.leg_cost.toFixed(2)}</b>`
+      )
+      .addTo(stopMarkers);
+  });
+
+  // Populate results table
+  const tbody = document.getElementById("results-body");
+  const tfoot = document.getElementById("results-foot");
+  tbody.innerHTML = "";
+  fuel_stops.forEach((stop, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${i + 1}</td>` +
+      `<td>${stop.name}</td>` +
+      `<td>${stop.city}, ${stop.state}</td>` +
+      `<td>${stop.distance_from_start_miles.toFixed(1)}</td>` +
+      `<td>$${stop.price_per_gallon.toFixed(3)}</td>` +
+      `<td>${stop.gallons_purchased.toFixed(1)}</td>` +
+      `<td>$${stop.leg_cost.toFixed(2)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  tfoot.innerHTML =
+    `<tr><td colspan="5">Total · ${route.total_distance_miles.toFixed(1)} mi · ${route.total_gallons.toFixed(1)} gal</td>` +
+    `<td colspan="2"><b>$${total_fuel_cost.toFixed(2)}</b></td></tr>`;
+
+  document.getElementById("results").classList.remove("hidden");
+
+  const stopWord = fuel_stops.length === 1 ? "stop" : "stops";
+  setStatus(
+    `Route: ${route.total_distance_miles.toFixed(1)} mi · ` +
+    `${fuel_stops.length} fuel ${stopWord} · ` +
+    `Total fuel cost: $${total_fuel_cost.toFixed(2)}`
+  );
+}
+
+/* ── All-stations toggle ── */
+document.getElementById("chk-stations").addEventListener("change", async (e) => {
+  if (!e.target.checked) {
+    if (allStationsLayer) { map.removeLayer(allStationsLayer); }
+    return;
+  }
+
+  // Lazy-load once
+  if (allStationsLayer) { allStationsLayer.addTo(map); return; }
+
+  setStatus("Loading all stations…");
+  try {
+    const resp = await fetch("/api/v1/stations/");
+    const stations = await resp.json();
+
+    const cluster = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
+    stations.forEach((s) => {
+      L.marker([s.latitude, s.longitude], { icon: stationIcon() })
+        .bindPopup(`<b>${s.name}</b><br>${s.city}, ${s.state}<br>$${parseFloat(s.price).toFixed(3)}/gal`)
+        .addTo(cluster);
+    });
+
+    allStationsLayer = cluster;
+    allStationsLayer.addTo(map);
+    setStatus(`Showing ${stations.length} stations. Enter start/finish to find a route.`);
+  } catch (err) {
+    setStatus("Failed to load stations: " + err.message, true);
+    e.target.checked = false;
+  }
+});
+
+/* ── CSRF helper ── */
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(";").shift();
+  return "";
+}
+</script>
+
+</body>
+</html>

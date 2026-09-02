@@ -16,20 +16,18 @@ import os
 
 import pygeohash
 import requests
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from stations.app_settings import (
-    GEOHASH_PRECISION,
-)
-from stations.app_settings import MAPQUEST_BATCH_SIZE as BATCH_SIZE
-from stations.app_settings import (
-    MAPQUEST_BATCH_URL,
-)
-from stations.app_settings import MAPQUEST_FIXTURE_PATH as FIXTURE_PATH
 from stations.management.commands.geocode_stations import (
     _load_existing_fixture,
     _read_csv_stations,
 )
+
+BATCH_SIZE = settings.MAPQUEST_BATCH_SIZE
+FIXTURE_PATH = settings.MAPQUEST_FIXTURE_PATH
+GEOHASH_PRECISION = settings.GEOHASH_PRECISION
+MAPQUEST_BATCH_URL = settings.MAPQUEST_BATCH_URL
 
 logger = logging.getLogger(__name__)
 

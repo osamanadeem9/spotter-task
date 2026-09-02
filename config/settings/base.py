@@ -81,6 +81,8 @@ STORAGES = {
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+from config.settings.app_settings import *  # noqa: E402, F401, F403
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

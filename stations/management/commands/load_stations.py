@@ -11,11 +11,13 @@ import json
 import logging
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from stations.app_settings import CSV_PATH
-from stations.app_settings import LOAD_FIXTURE_PATH as FIXTURE_PATH
 from stations.models import FuelStation
+
+CSV_PATH = settings.CSV_PATH
+FIXTURE_PATH = settings.LOAD_FIXTURE_PATH
 
 logger = logging.getLogger(__name__)
 

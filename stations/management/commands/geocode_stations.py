@@ -13,18 +13,15 @@ import time
 
 import pygeohash
 import requests
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from stations.app_settings import (
-    CSV_PATH,
-    GEOHASH_PRECISION,
-)
-from stations.app_settings import NOMINATIM_FIXTURE_PATH as FIXTURE_PATH
-from stations.app_settings import NOMINATIM_REQUEST_DELAY as REQUEST_DELAY
-from stations.app_settings import (
-    NOMINATIM_URL,
-    NOMINATIM_USER_AGENT,
-)
+CSV_PATH = settings.CSV_PATH
+FIXTURE_PATH = settings.NOMINATIM_FIXTURE_PATH
+GEOHASH_PRECISION = settings.GEOHASH_PRECISION
+NOMINATIM_URL = settings.NOMINATIM_URL
+NOMINATIM_USER_AGENT = settings.NOMINATIM_USER_AGENT
+REQUEST_DELAY = settings.NOMINATIM_REQUEST_DELAY
 
 logger = logging.getLogger(__name__)
 
